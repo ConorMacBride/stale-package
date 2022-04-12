@@ -1,18 +1,71 @@
 const core = require('@actions/core');
-const wait = require('./wait');
+const exec = require('@actions/exec')
+const pypi = require('./pypi');
+const anaconda = require('./anaconda');
+const azure = require('./azure');
 
 
-// most @actions toolkit packages have async methods
+async function getInstalledVersion(name) {
+  let details = '';
+  const options = {};
+  options.listeners = {
+    stdout: function (data) {
+      details += data.toString();
+    }
+  };
+  options.ignoreReturnCode = true;
+  const errorCode = await exec.exec('python',
+      ['-m', 'pip', 'show', name], options);
+  if (errorCode !== 0) {
+    core.setFailed(`${name} not found with pip show`)
+  }
+  console.error("Not Implemented")
+}
+
+
+function parseDate(date_input) {
+  let date;
+  if (/^\d+$/.test(date_input)) {
+    let days = parseInt(date_input);
+    date = new Date.now();
+    date.setDate(date.getDate() + days);
+  } else {
+    date = new Date.parse(date_input);
+  }
+  return date;
+}
+
+
 async function run() {
   try {
-    const ms = core.getInput('milliseconds');
-    core.info(`Waiting ${ms} milliseconds ...`);
 
-    core.debug((new Date()).toTimeString()); // debug is only output if you set the secret `ACTIONS_RUNNER_DEBUG` to true
-    await wait(parseInt(ms));
-    core.info((new Date()).toTimeString());
+    // Select index
+    const indexes = {
+      'pypi': pypi.find,
+      'anaconda': anaconda.find,
+      'azure': azure.find,
+    };
+    const index = core.getInput('index');
+    const find = indexes[index];
+    if (typeof find === 'undefined') {
+      core.setFailed(`Index ${index} not recognised. Must be one of ${Object.keys(indexes)}`);
+    }
 
-    core.setOutput('time', new Date().toTimeString());
+    const packageName = core.getInput('package');
+    const version = getInstalledVersion(packageName);
+    core.setOutput('version', version);
+
+    const datePublished = find(packageName, version);
+    core.setOutput('date-published', datePublished.toString());
+
+    // Parse best before date
+    const bestBefore = core.getInput('best-before');
+    if (bestBefore.length > 0) {
+      const date = parseDate(bestBefore);
+      if (datePublished < date) {
+        core.error(`${packageName} is stale. ${version} was published at ${datePublished}`)
+      }
+    }
   } catch (error) {
     core.setFailed(error.message);
   }

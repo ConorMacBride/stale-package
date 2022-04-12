@@ -1,13 +1,22 @@
-name: 'Wait'
-description: 'Wait a designated number of milliseconds'
+name: 'Stale Package'
+description: 'GitHub Action to find a Python package''s publication date and fail if stale'
 inputs:
-  milliseconds:  # id of input
-    description: 'number of milliseconds to wait'
+  package:
+    description: 'Package name'
     required: true
-    default: '1000'
+  best-before:
+    description: 'Fail if the package is older than this date (or number of days)'
+    required: false
+    default: '365'
+  index:
+    description: 'Index to extract publication date from'
+    required: false
+    default: 'pypi'
 outputs:
-  time: # output will be available to future steps
-    description: 'The current time after waiting'
+  version:
+    description: 'Version of installed package'
+  date-published:
+    description: 'Date installed package was published'
 runs:
   using: 'node16'
   main: 'dist/index.js'
